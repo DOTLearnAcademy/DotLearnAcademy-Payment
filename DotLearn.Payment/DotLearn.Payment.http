@@ -1,0 +1,6 @@
+@DotLearn.Payment_HostAddress = http://localhost:5222
+
+GET {{DotLearn.Payment_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
