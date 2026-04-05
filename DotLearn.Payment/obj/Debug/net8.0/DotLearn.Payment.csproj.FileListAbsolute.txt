@@ -1,0 +1,8 @@
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.csproj.AssemblyReference.cache
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.AssemblyInfoInputs.cache
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.AssemblyInfo.cs
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.csproj.CoreCompileInputs.cache
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\samar\OneDrive\Desktop\DOTLearn_Academy\DotLearnAcademy-Payment\DotLearn.Payment\obj\Debug\net8.0\DotLearn.Payment.sourcelink.json
