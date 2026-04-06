@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DotLearn.Payment")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c4c875ffd2c05af76e211ff15a651dfd978ba154")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+570492af84102d4047f8e3a8b4da0ce8727fbcb4")]
 [assembly: System.Reflection.AssemblyProductAttribute("DotLearn.Payment")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DotLearn.Payment")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
