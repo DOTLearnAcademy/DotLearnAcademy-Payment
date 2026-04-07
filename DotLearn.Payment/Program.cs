@@ -3,6 +3,10 @@ using DotLearn.Payment.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Amazon;
+using Kralizek.Extensions.Configuration;
+using Amazon.SQS;
+using DotLearn.Payment.Repositories;
+using DotLearn.Payment.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,12 +17,17 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// AWS Secrets Manager
-builder.Configuration.AddSecretsManager(region: RegionEndpoint.APSoutheast2);
+// AWS Secrets Manager (Only in non-Development environments)
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddSecretsManager(region: Amazon.RegionEndpoint.APSoutheast2);
+}
 
 // Add services to the container.
-var connStr = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<AppDbContext>(options =>
+var connStr = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+builder.Services.AddDbContext<PaymentDbContext>(options =>
     options.UseSqlServer(connStr));
 
 builder.Services.AddHealthChecks().AddSqlServer(connStr);
@@ -26,6 +35,17 @@ builder.Services.AddHealthChecks().AddSqlServer(connStr);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<SqsService>();
+builder.Services.AddScoped<RazorpaySignatureService>();
+builder.Services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOptions
+{
+    Region = Amazon.RegionEndpoint.APSoutheast2
+});
+builder.Services.AddAWSService<IAmazonSQS>();
 
 // Authentication & Authorization (Placeholder)
 builder.Services.AddAuthentication();
