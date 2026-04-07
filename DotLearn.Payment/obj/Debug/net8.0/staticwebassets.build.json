@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "ayQo4L3kxBV0GvLC5WOGXAmaiyuBkfdAPdQ4v5M5BXk=",
+  "Source": "DotLearn.Payment",
+  "BasePath": "_content/DotLearn.Payment",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
