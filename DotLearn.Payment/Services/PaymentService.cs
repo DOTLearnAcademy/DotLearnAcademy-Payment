@@ -45,10 +45,24 @@ public class PaymentService : IPaymentService
         };
 
         var order = client.Order.Create(options);
-        var orderId = order["id"].ToString();
+        var orderId = order["id"].ToString()!;
+
+        var payment = new Models.Entities.Payment
+        {
+            Id = Guid.NewGuid(),
+            StudentId = studentId,
+            CourseId = request.CourseId, // Extracted from request
+            Amount = amount / 100m,
+            Currency = "INR",
+            Provider = "razorpay",
+            OrderId = orderId,
+            Status = PaymentStatus.Pending,
+            CompletedAt = DateTime.UtcNow
+        };
+        await _repo.AddAsync(payment);
 
         return new CheckoutResponseDto(
-            orderId!,
+            orderId,
             amount / 100m,
             "INR",
             keyId
