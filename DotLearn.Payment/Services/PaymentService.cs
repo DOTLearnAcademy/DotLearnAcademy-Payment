@@ -55,7 +55,7 @@ public class PaymentService : IPaymentService
             Amount = amount / 100m,
             Currency = "INR",
             Provider = "razorpay",
-            TransactionId = string.Empty, // filled in after Razorpay confirms payment
+            TransactionId = $"pending_{Guid.NewGuid():N}", // unique placeholder; replaced in VerifyPaymentAsync
             OrderId = orderId,
             Status = PaymentStatus.Pending,
             CompletedAt = null
