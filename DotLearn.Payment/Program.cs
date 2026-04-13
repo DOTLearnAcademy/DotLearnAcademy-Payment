@@ -106,11 +106,33 @@ app.UseAuthorization();
 app.MapControllers(); // MapControllers FIRST
 app.MapHealthChecks("/health"); // MapHealthChecks SECOND
 
-// Auto-create DB schema on startup (idempotent)
+// Auto-create DB schema on startup (idempotent — safe even if DB already exists)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (
+            SELECT * FROM sys.objects
+            WHERE object_id = OBJECT_ID(N'[dbo].[Payments]') AND type = N'U'
+        )
+        BEGIN
+            CREATE TABLE [dbo].[Payments] (
+                [Id]            uniqueidentifier NOT NULL,
+                [StudentId]     uniqueidentifier NOT NULL,
+                [CourseId]      uniqueidentifier NOT NULL,
+                [Amount]        decimal(18,2)    NOT NULL,
+                [Currency]      nvarchar(10)     NOT NULL,
+                [Provider]      nvarchar(50)     NOT NULL,
+                [TransactionId] nvarchar(200)    NOT NULL,
+                [OrderId]       nvarchar(200)    NOT NULL,
+                [Status]        int              NOT NULL DEFAULT 0,
+                [CreatedAt]     datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                [CompletedAt]   datetime2        NULL,
+                CONSTRAINT [PK_Payments] PRIMARY KEY ([Id])
+            );
+            CREATE UNIQUE INDEX [IX_Payments_TransactionId] ON [dbo].[Payments] ([TransactionId]);
+        END
+    ");
 }
 
 app.Run();
