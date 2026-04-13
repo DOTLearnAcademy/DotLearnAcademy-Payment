@@ -51,13 +51,14 @@ public class PaymentService : IPaymentService
         {
             Id = Guid.NewGuid(),
             StudentId = studentId,
-            CourseId = request.CourseId, // Extracted from request
+            CourseId = request.CourseId,
             Amount = amount / 100m,
             Currency = "INR",
             Provider = "razorpay",
+            TransactionId = string.Empty, // filled in after Razorpay confirms payment
             OrderId = orderId,
             Status = PaymentStatus.Pending,
-            CompletedAt = DateTime.UtcNow
+            CompletedAt = null
         };
         await _repo.AddAsync(payment);
 
