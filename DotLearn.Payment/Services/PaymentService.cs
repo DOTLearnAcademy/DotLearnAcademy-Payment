@@ -40,7 +40,7 @@ public class PaymentService : IPaymentService
         {
             { "amount", amount },
             { "currency", "INR" },
-            { "receipt", $"receipt_{Guid.NewGuid()}" },
+            { "receipt", $"rcpt_{Guid.NewGuid():N}"[..21] },
             { "payment_capture", 1 }
         };
 
