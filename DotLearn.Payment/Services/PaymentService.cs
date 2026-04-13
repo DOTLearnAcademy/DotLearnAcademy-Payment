@@ -6,23 +6,57 @@ using System.Text.Json;
 
 namespace DotLearn.Payment.Services;
 
+public interface IRazorpayOrderService
+{
+    string CreateOrder(int amount, string currency, string receipt);
+}
+
+public class RazorpayOrderService : IRazorpayOrderService
+{
+    private readonly string _keyId;
+    private readonly string _keySecret;
+
+    public RazorpayOrderService(IConfiguration config)
+    {
+        _keyId = config["Razorpay:KeyId"] ?? "";
+        _keySecret = config["Razorpay:KeySecret"] ?? "";
+    }
+
+    public string CreateOrder(int amount, string currency, string receipt)
+    {
+        var client = new RazorpayClient(_keyId, _keySecret);
+        var options = new Dictionary<string, object>
+        {
+            { "amount", amount },
+            { "currency", currency },
+            { "receipt", receipt },
+            { "payment_capture", 1 }
+        };
+        var order = client.Order.Create(options);
+        return order["id"].ToString()!;
+    }
+}
+
 public class PaymentService : IPaymentService
 {
     private readonly IPaymentRepository _repo;
     private readonly SqsService _sqsService;
     private readonly RazorpaySignatureService _signatureService;
     private readonly IConfiguration _config;
+    private readonly IRazorpayOrderService _razorpayOrderService;
 
     public PaymentService(
         IPaymentRepository repo,
         SqsService sqsService,
         RazorpaySignatureService signatureService,
-        IConfiguration config)
+        IConfiguration config,
+        IRazorpayOrderService razorpayOrderService = null!)
     {
         _repo = repo;
         _sqsService = sqsService;
         _signatureService = signatureService;
         _config = config;
+        _razorpayOrderService = razorpayOrderService ?? new RazorpayOrderService(config);
     }
 
     public async Task<CheckoutResponseDto> CreateCheckoutAsync(
@@ -35,17 +69,7 @@ public class PaymentService : IPaymentService
         // For now using placeholder amount
         var amount = 49900; // in paise (499.00 INR)
 
-        var client = new RazorpayClient(keyId, keySecret);
-        var options = new Dictionary<string, object>
-        {
-            { "amount", amount },
-            { "currency", "INR" },
-            { "receipt", $"rcpt_{Guid.NewGuid():N}"[..21] },
-            { "payment_capture", 1 }
-        };
-
-        var order = client.Order.Create(options);
-        var orderId = order["id"].ToString()!;
+        string orderId = _razorpayOrderService.CreateOrder(amount, "INR", $"rcpt_{Guid.NewGuid():N}"[..21]);
 
         var payment = new Models.Entities.Payment
         {
@@ -85,25 +109,18 @@ public class PaymentService : IPaymentService
 
         // Get order to find course/amount
         var pendingPayment = await _repo.GetByOrderIdAsync(request.OrderId);
+        
+        if (pendingPayment == null) 
+            throw new KeyNotFoundException("Pending payment not found for order.");
 
-        var payment = new Models.Entities.Payment
-        {
-            Id = Guid.NewGuid(),
-            StudentId = studentId,
-            CourseId = pendingPayment?.CourseId ?? Guid.Empty,
-            Amount = pendingPayment?.Amount ?? 0,
-            Currency = "INR",
-            Provider = "razorpay",
-            TransactionId = request.PaymentId,
-            OrderId = request.OrderId,
-            Status = PaymentStatus.Succeeded,
-            CompletedAt = DateTime.UtcNow
-        };
+        pendingPayment.TransactionId = request.PaymentId;
+        pendingPayment.Status = PaymentStatus.Succeeded;
+        pendingPayment.CompletedAt = DateTime.UtcNow;
 
-        await _repo.AddAsync(payment);
-        await _sqsService.PublishPaymentSucceededAsync(payment);
+        await _repo.UpdateAsync(pendingPayment);
+        await _sqsService.PublishPaymentSucceededAsync(pendingPayment);
 
-        return MapToDto(payment);
+        return MapToDto(pendingPayment);
     }
 
     public async Task HandleWebhookAsync(string payload, string signature)
@@ -131,22 +148,15 @@ public class PaymentService : IPaymentService
             var existing = await _repo.GetByTransactionIdAsync(transactionId);
             if (existing != null) return;
 
-            var payment = new Models.Entities.Payment
+            var pendingPayment = await _repo.GetByOrderIdAsync(orderId);
+            if (pendingPayment != null)
             {
-                Id = Guid.NewGuid(),
-                StudentId = Guid.Empty, // resolved via orderId in real impl
-                CourseId = Guid.Empty,
-                Amount = paymentEntity.GetProperty("amount").GetDecimal() / 100,
-                Currency = "INR",
-                Provider = "razorpay",
-                TransactionId = transactionId,
-                OrderId = orderId,
-                Status = PaymentStatus.Succeeded,
-                CompletedAt = DateTime.UtcNow
-            };
-
-            await _repo.AddAsync(payment);
-            await _sqsService.PublishPaymentSucceededAsync(payment);
+                pendingPayment.TransactionId = transactionId;
+                pendingPayment.Status = PaymentStatus.Succeeded;
+                pendingPayment.CompletedAt = DateTime.UtcNow;
+                await _repo.UpdateAsync(pendingPayment);
+                await _sqsService.PublishPaymentSucceededAsync(pendingPayment);
+            }
         }
         else if (eventType == "payment.failed")
         {

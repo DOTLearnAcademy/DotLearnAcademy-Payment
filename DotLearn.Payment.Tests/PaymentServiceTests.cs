@@ -15,6 +15,7 @@ public class PaymentServiceTests
     private Mock<IPaymentRepository> _repoMock = null!;
     private Mock<IAmazonSQS> _sqsMock = null!;
     private Mock<IConfiguration> _configMock = null!;
+    private Mock<IRazorpayOrderService> _razorpayMock = null!;
     private SqsService _sqsService = null!;
     private RazorpaySignatureService _signatureService = null!;
     private IPaymentService _service = null!;
@@ -25,6 +26,7 @@ public class PaymentServiceTests
         _repoMock = new Mock<IPaymentRepository>();
         _sqsMock = new Mock<IAmazonSQS>();
         _configMock = new Mock<IConfiguration>();
+        _razorpayMock = new Mock<IRazorpayOrderService>();
 
         _configMock.Setup(c => c["SQS:PaymentSucceededQueue"])
             .Returns("https://sqs.ap-southeast-2.amazonaws.com/test/queue");
@@ -47,7 +49,8 @@ public class PaymentServiceTests
             _repoMock.Object,
             _sqsService,
             _signatureService,
-            _configMock.Object);
+            _configMock.Object,
+            _razorpayMock.Object);
     }
 
     [TestMethod]
@@ -103,7 +106,10 @@ public class PaymentServiceTests
 
         _repoMock.Setup(r => r.GetByTransactionIdAsync(transactionId))
             .ReturnsAsync((DotLearn.Payment.Models.Entities.Payment?)null);
-        _repoMock.Setup(r => r.AddAsync(It.IsAny<DotLearn.Payment.Models.Entities.Payment>()))
+        var pending = new DotLearn.Payment.Models.Entities.Payment { OrderId = orderId, Status = PaymentStatus.Pending };
+        _repoMock.Setup(r => r.GetByOrderIdAsync(orderId))
+            .ReturnsAsync(pending);
+        _repoMock.Setup(r => r.UpdateAsync(It.IsAny<DotLearn.Payment.Models.Entities.Payment>()))
             .Returns(Task.CompletedTask);
 
         var payload = System.Text.Json.JsonSerializer.Serialize(new
@@ -131,7 +137,7 @@ public class PaymentServiceTests
 
         await _service.HandleWebhookAsync(payload, signature);
 
-        _repoMock.Verify(r => r.AddAsync(
+        _repoMock.Verify(r => r.UpdateAsync(
             It.IsAny<DotLearn.Payment.Models.Entities.Payment>()), Times.Once);
         _sqsMock.Verify(s => s.SendMessageAsync(
             It.IsAny<SendMessageRequest>(), default), Times.Once);
@@ -161,5 +167,29 @@ public class PaymentServiceTests
         Assert.AreEqual(PaymentStatus.Refunded, payment.Status);
         _sqsMock.Verify(s => s.SendMessageAsync(
             It.IsAny<SendMessageRequest>(), default), Times.Once);
+    }
+
+    [TestMethod]
+    public async Task CreateCheckoutAsync_SetsPendingTransactionId_BeforePersisting()
+    {
+        DotLearn.Payment.Models.Entities.Payment? captured = null;
+
+        _repoMock.Setup(r => r.AddAsync(It.IsAny<DotLearn.Payment.Models.Entities.Payment>()))
+            .Callback<DotLearn.Payment.Models.Entities.Payment>(p => captured = p)
+            .Returns(Task.CompletedTask);
+
+        _configMock.Setup(c => c["Razorpay:KeyId"]).Returns("test_key");
+        _configMock.Setup(c => c["Razorpay:KeySecret"]).Returns("test_secret");
+
+        _razorpayMock.Setup(r => r.CreateOrder(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns("fake_order_xyz");
+
+        await _service.CreateCheckoutAsync(new DotLearn.Payment.Models.DTOs.CheckoutRequestDto(Guid.NewGuid()), Guid.NewGuid());
+
+        Assert.IsNotNull(captured);
+        Assert.IsNotNull(captured.TransactionId);
+        Assert.IsTrue(captured.TransactionId.StartsWith("pending_"));
+        Assert.AreEqual("fake_order_xyz", captured.OrderId);
+        Assert.AreEqual(PaymentStatus.Pending, captured.Status);
     }
 }
