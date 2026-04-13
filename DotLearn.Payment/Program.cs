@@ -106,12 +106,26 @@ app.UseAuthorization();
 app.MapControllers(); // MapControllers FIRST
 app.MapHealthChecks("/health"); // MapHealthChecks SECOND
 
-// Auto-create DB schema on startup (idempotent — safe even if DB already exists)
+// Auto-create / migrate DB schema on startup (idempotent)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
 
-    // 1. Create table if it doesn't exist at all
+    // If table exists but is missing critical columns (old schema), drop it so it gets recreated below
+    db.Database.ExecuteSqlRaw(@"
+        IF EXISTS (
+            SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Payments]') AND type = N'U'
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE Name = N'TransactionId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]')
+        )
+        BEGIN
+            DROP TABLE [dbo].[Payments]
+        END
+    ");
+
+    // Create table with correct schema if it doesn't exist
     db.Database.ExecuteSqlRaw(@"
         IF NOT EXISTS (
             SELECT * FROM sys.objects
@@ -124,9 +138,9 @@ using (var scope = app.Services.CreateScope())
                 [CourseId]      uniqueidentifier NOT NULL,
                 [Amount]        decimal(18,2)    NOT NULL,
                 [Currency]      nvarchar(10)     NOT NULL DEFAULT 'INR',
-                [Provider]      nvarchar(50)     NOT NULL,
+                [Provider]      nvarchar(50)     NOT NULL DEFAULT 'razorpay',
                 [TransactionId] nvarchar(200)    NOT NULL,
-                [OrderId]       nvarchar(200)    NOT NULL,
+                [OrderId]       nvarchar(200)    NOT NULL DEFAULT '',
                 [Status]        int              NOT NULL DEFAULT 0,
                 [CreatedAt]     datetime2        NOT NULL DEFAULT GETUTCDATE(),
                 [CompletedAt]   datetime2        NULL,
@@ -135,31 +149,17 @@ using (var scope = app.Services.CreateScope())
         END
     ");
 
-    // 2. Idempotent column migrations — add missing columns if table was created before these fields existed
+    // Unique index on TransactionId
     db.Database.ExecuteSqlRaw(@"
-        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'TransactionId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
-            ALTER TABLE [dbo].[Payments] ADD [TransactionId] nvarchar(200) NOT NULL DEFAULT '';
-    ");
-
-    db.Database.ExecuteSqlRaw(@"
-        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'OrderId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
-            ALTER TABLE [dbo].[Payments] ADD [OrderId] nvarchar(200) NOT NULL DEFAULT '';
-    ");
-
-    db.Database.ExecuteSqlRaw(@"
-        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'Currency' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
-            ALTER TABLE [dbo].[Payments] ADD [Currency] nvarchar(10) NOT NULL DEFAULT 'INR';
-    ");
-
-    db.Database.ExecuteSqlRaw(@"
-        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'Provider' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
-            ALTER TABLE [dbo].[Payments] ADD [Provider] nvarchar(50) NOT NULL DEFAULT 'razorpay';
-    ");
-
-    // 3. Ensure unique index on TransactionId
-    db.Database.ExecuteSqlRaw(@"
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE Name = N'IX_Payments_TransactionId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
-            CREATE UNIQUE INDEX [IX_Payments_TransactionId] ON [dbo].[Payments] ([TransactionId]);
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE Name = N'IX_Payments_TransactionId'
+            AND Object_ID = OBJECT_ID(N'[dbo].[Payments]')
+        )
+        BEGIN
+            CREATE UNIQUE INDEX [IX_Payments_TransactionId]
+                ON [dbo].[Payments] ([TransactionId])
+        END
     ");
 }
 
