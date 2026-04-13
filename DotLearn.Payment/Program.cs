@@ -106,4 +106,11 @@ app.UseAuthorization();
 app.MapControllers(); // MapControllers FIRST
 app.MapHealthChecks("/health"); // MapHealthChecks SECOND
 
+// Auto-create DB schema on startup (idempotent)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+    db.Database.EnsureCreated();
+}
+
 app.Run();
