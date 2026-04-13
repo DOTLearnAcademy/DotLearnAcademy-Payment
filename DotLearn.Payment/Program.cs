@@ -110,6 +110,8 @@ app.MapHealthChecks("/health"); // MapHealthChecks SECOND
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+
+    // 1. Create table if it doesn't exist at all
     db.Database.ExecuteSqlRaw(@"
         IF NOT EXISTS (
             SELECT * FROM sys.objects
@@ -121,7 +123,7 @@ using (var scope = app.Services.CreateScope())
                 [StudentId]     uniqueidentifier NOT NULL,
                 [CourseId]      uniqueidentifier NOT NULL,
                 [Amount]        decimal(18,2)    NOT NULL,
-                [Currency]      nvarchar(10)     NOT NULL,
+                [Currency]      nvarchar(10)     NOT NULL DEFAULT 'INR',
                 [Provider]      nvarchar(50)     NOT NULL,
                 [TransactionId] nvarchar(200)    NOT NULL,
                 [OrderId]       nvarchar(200)    NOT NULL,
@@ -129,9 +131,35 @@ using (var scope = app.Services.CreateScope())
                 [CreatedAt]     datetime2        NOT NULL DEFAULT GETUTCDATE(),
                 [CompletedAt]   datetime2        NULL,
                 CONSTRAINT [PK_Payments] PRIMARY KEY ([Id])
-            );
-            CREATE UNIQUE INDEX [IX_Payments_TransactionId] ON [dbo].[Payments] ([TransactionId]);
+            )
         END
+    ");
+
+    // 2. Idempotent column migrations — add missing columns if table was created before these fields existed
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'TransactionId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
+            ALTER TABLE [dbo].[Payments] ADD [TransactionId] nvarchar(200) NOT NULL DEFAULT '';
+    ");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'OrderId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
+            ALTER TABLE [dbo].[Payments] ADD [OrderId] nvarchar(200) NOT NULL DEFAULT '';
+    ");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'Currency' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
+            ALTER TABLE [dbo].[Payments] ADD [Currency] nvarchar(10) NOT NULL DEFAULT 'INR';
+    ");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'Provider' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
+            ALTER TABLE [dbo].[Payments] ADD [Provider] nvarchar(50) NOT NULL DEFAULT 'razorpay';
+    ");
+
+    // 3. Ensure unique index on TransactionId
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE Name = N'IX_Payments_TransactionId' AND Object_ID = OBJECT_ID(N'[dbo].[Payments]'))
+            CREATE UNIQUE INDEX [IX_Payments_TransactionId] ON [dbo].[Payments] ([TransactionId]);
     ");
 }
 
