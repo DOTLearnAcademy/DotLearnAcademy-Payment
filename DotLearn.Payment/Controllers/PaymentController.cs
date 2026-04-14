@@ -3,6 +3,7 @@ using DotLearn.Payment.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace DotLearn.Payment.Controllers;
 
@@ -124,11 +125,15 @@ public class PaymentController : ControllerBase
     // ── Helpers ──────────────────────────────────────────────────
     private Guid GetUserId()
     {
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (claim == null) 
+        var userId =
+            User.FindFirstValue(JwtRegisteredClaimNames.Sub) ??
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+            User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrWhiteSpace(userId))
             throw new UnauthorizedAccessException("User ID not found in token.");
-            
-        return Guid.Parse(claim.Value);
+
+        return Guid.Parse(userId);
     }
 
     private string GetUserRole()

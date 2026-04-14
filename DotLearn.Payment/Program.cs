@@ -2,6 +2,7 @@ using DotLearn.Payment.Data;
 using DotLearn.Payment.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Security.Claims;
 using Amazon;
 using Kralizek.Extensions.Configuration;
 using Amazon.SQS;
@@ -51,19 +52,24 @@ builder.Services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOpt
 builder.Services.AddAWSService<IAmazonSQS>();
 
 // Authentication & Authorization — JWT Bearer
-var jwtKey = builder.Configuration["Jwt:Secret"] ?? "placeholder-key-32-chars-minimum!";
-var jwtIssuer = "dotlearn-auth";
+var jwksUri = builder.Configuration["Auth:JwksUri"];
+var authority = jwksUri?.Replace("/.well-known/jwks.json", "");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Authority = authority;
+        options.RequireHttpsMetadata = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
+            ValidIssuer = "dotlearn-auth",
             ValidateAudience = false,
-            ValidateLifetime = true
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            NameClaimType = "sub",
+            RoleClaimType = ClaimTypes.Role
         };
     });
 builder.Services.AddAuthorization();
