@@ -10,7 +10,7 @@ using DotLearn.Payment.Repositories;
 using DotLearn.Payment.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,14 +51,13 @@ builder.Services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOpt
 });
 builder.Services.AddAWSService<IAmazonSQS>();
 
-// Authentication & Authorization — JWT Bearer
-var jwksUri = builder.Configuration["Auth:JwksUri"];
-var authority = jwksUri?.Replace("/.well-known/jwks.json", "");
+// Authentication & Authorization — manual JWKS loading (no OIDC discovery needed)
+var jwksUri = builder.Configuration["Auth:JwksUri"]
+    ?? "http://auth/auth/.well-known/jwks.json";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = authority;
         options.RequireHttpsMetadata = false;
 
         options.TokenValidationParameters = new TokenValidationParameters
@@ -68,6 +67,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
+            {
+                using var http = new HttpClient();
+                var json = http.GetStringAsync(jwksUri).GetAwaiter().GetResult();
+                var jwks = new JsonWebKeySet(json);
+                return jwks.GetSigningKeys();
+            },
             NameClaimType = "sub",
             RoleClaimType = ClaimTypes.Role
         };

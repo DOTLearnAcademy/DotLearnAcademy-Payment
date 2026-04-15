@@ -41,3 +41,10 @@ cert/
 
 
 DotLearn.Payment/Data/PaymentDbContextFactory.cs
+
+# Custom Deployment Artifact Ignores
+*.tar.gz
+publish-*/
+publish-v*
+*.sql
+migration_error_capture.txt
