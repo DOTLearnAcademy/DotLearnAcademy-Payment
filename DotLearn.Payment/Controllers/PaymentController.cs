@@ -30,6 +30,10 @@ public class PaymentController : ControllerBase
                 .CreateCheckoutAsync(request, GetUserId());
             return Ok(result);
         }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
             return BadRequest(new { error = ex.Message });

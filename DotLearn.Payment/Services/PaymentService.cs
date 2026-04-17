@@ -44,39 +44,61 @@ public class PaymentService : IPaymentService
     private readonly RazorpaySignatureService _signatureService;
     private readonly IConfiguration _config;
     private readonly IRazorpayOrderService _razorpayOrderService;
+    private readonly DotLearn.Payment.Clients.ICourseClient _courseClient;
 
     public PaymentService(
         IPaymentRepository repo,
         SqsService sqsService,
         RazorpaySignatureService signatureService,
         IConfiguration config,
+        DotLearn.Payment.Clients.ICourseClient courseClient,
         IRazorpayOrderService razorpayOrderService = null!)
     {
         _repo = repo;
         _sqsService = sqsService;
         _signatureService = signatureService;
         _config = config;
+        _courseClient = courseClient;
         _razorpayOrderService = razorpayOrderService ?? new RazorpayOrderService(config);
     }
 
     public async Task<CheckoutResponseDto> CreateCheckoutAsync(
         CheckoutRequestDto request, Guid studentId)
     {
-        var keyId = _config["Razorpay:KeyId"]!;
-        var keySecret = _config["Razorpay:KeySecret"]!;
+        if (request.CourseId == Guid.Empty)
+            throw new ArgumentException("CourseId is required.");
 
-        // TODO: Call Course Service internal API to get real price
-        // For now using placeholder amount
-        var amount = 49900; // in paise (499.00 INR)
+        var existingSuccessfulPayment =
+            await _repo.GetSuccessfulByStudentAndCourseAsync(studentId, request.CourseId);
+        if (existingSuccessfulPayment != null)
+            throw new InvalidOperationException("You already purchased this course.");
 
-        string orderId = _razorpayOrderService.CreateOrder(amount, "INR", $"rcpt_{Guid.NewGuid():N}"[..21]);
+        var keyId = _config["Razorpay:KeyId"]
+            ?? throw new InvalidOperationException("Razorpay KeyId is missing.");
+
+        var coursePrice = await _courseClient.GetCoursePriceAsync(request.CourseId);
+
+        if (!coursePrice.IsPublished)
+            throw new InvalidOperationException("This course is currently unpublished and cannot be purchased.");
+
+        if (coursePrice.IsFree || coursePrice.Price <= 0)
+            throw new InvalidOperationException("This course is free; use the free enrollment flow instead of submitting a payment.");
+
+        var amount = (int)(coursePrice.Price * 100m);
+        if (amount <= 0)
+            throw new InvalidOperationException("Invalid payable amount calculated.");
+
+        string orderId = _razorpayOrderService.CreateOrder(
+            amount,
+            "INR",
+            $"rcpt_{Guid.NewGuid():N}"[..21]);
 
         var payment = new Models.Entities.Payment
         {
             Id = Guid.NewGuid(),
             StudentId = studentId,
             CourseId = request.CourseId,
-            Amount = amount / 100m,
+            Amount = coursePrice.Price,
             Currency = "INR",
             Provider = "razorpay",
             TransactionId = $"pending_{Guid.NewGuid():N}", // unique placeholder; replaced in VerifyPaymentAsync
@@ -88,11 +110,13 @@ public class PaymentService : IPaymentService
 
         return new CheckoutResponseDto(
             orderId,
-            amount / 100m,
+            coursePrice.Price,
             "INR",
             keyId
         );
     }
+
+
 
     public async Task<PaymentResponseDto> VerifyPaymentAsync(
         VerifyPaymentRequestDto request, Guid studentId)

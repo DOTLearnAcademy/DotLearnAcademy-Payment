@@ -24,6 +24,14 @@ public class PaymentRepository : IPaymentRepository
         await _context.Payments
             .FirstOrDefaultAsync(p => p.OrderId == orderId);
 
+    public async Task<Models.Entities.Payment?> GetSuccessfulByStudentAndCourseAsync(
+        Guid studentId, Guid courseId) =>
+        await _context.Payments
+            .FirstOrDefaultAsync(p =>
+                p.StudentId == studentId &&
+                p.CourseId == courseId &&
+                p.Status == PaymentStatus.Succeeded);
+
     public async Task<List<Models.Entities.Payment>> GetByStudentIdAsync(Guid studentId) =>
         await _context.Payments
             .Where(p => p.StudentId == studentId)

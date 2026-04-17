@@ -11,7 +11,7 @@ using DotLearn.Payment.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Net.Http;
-
+using DotLearn.Payment.Clients;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Serilog
@@ -39,6 +39,14 @@ builder.Services.AddHealthChecks().AddSqlServer(connStr);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient();
+
+// Internal Microservice communication client
+builder.Services.AddHttpClient<ICourseClient, CourseClient>(client =>
+{
+    client.BaseAddress = new Uri("http://course:80");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<PaymentService>();

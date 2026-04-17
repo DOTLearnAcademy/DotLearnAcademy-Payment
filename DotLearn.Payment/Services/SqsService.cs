@@ -28,11 +28,26 @@ public class SqsService
             Timestamp = DateTime.UtcNow
         });
 
-        await _sqsClient.SendMessageAsync(new SendMessageRequest
+        var enrollmentQueueUrl = _config["SQS:EnrollmentPaymentSucceededQueue"];
+        var notificationQueueUrl = _config["SQS:NotificationPaymentSucceededQueue"];
+
+        if (!string.IsNullOrWhiteSpace(enrollmentQueueUrl))
         {
-            QueueUrl = _config["SQS:PaymentSucceededQueue"],
-            MessageBody = message
-        });
+            await _sqsClient.SendMessageAsync(new SendMessageRequest
+            {
+                QueueUrl = enrollmentQueueUrl,
+                MessageBody = message
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(notificationQueueUrl))
+        {
+            await _sqsClient.SendMessageAsync(new SendMessageRequest
+            {
+                QueueUrl = notificationQueueUrl,
+                MessageBody = message
+            });
+        }
     }
 
     public async Task PublishPaymentFailedAsync(Models.Entities.Payment payment)
