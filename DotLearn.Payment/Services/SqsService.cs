@@ -16,8 +16,19 @@ public class SqsService
         _config = config;
     }
 
+    /// <summary>
+    /// Publishes a PaymentSucceeded event to the Enrollment queue so the
+    /// Enrollment service can create the student's enrollment record.
+    /// </summary>
     public async Task PublishPaymentSucceededAsync(Models.Entities.Payment payment)
     {
+        var enrollmentQueueUrl = _config["SQS:EnrollmentPaymentSucceededQueue"];
+
+        if (string.IsNullOrWhiteSpace(enrollmentQueueUrl))
+        {
+            return; // SQS not configured (e.g. local dev without LocalStack)
+        }
+
         var message = JsonSerializer.Serialize(new
         {
             EventType = "PaymentSucceeded",
@@ -28,60 +39,9 @@ public class SqsService
             Timestamp = DateTime.UtcNow
         });
 
-        var enrollmentQueueUrl = _config["SQS:EnrollmentPaymentSucceededQueue"];
-        var notificationQueueUrl = _config["SQS:NotificationPaymentSucceededQueue"];
-
-        if (!string.IsNullOrWhiteSpace(enrollmentQueueUrl))
-        {
-            await _sqsClient.SendMessageAsync(new SendMessageRequest
-            {
-                QueueUrl = enrollmentQueueUrl,
-                MessageBody = message
-            });
-        }
-
-        if (!string.IsNullOrWhiteSpace(notificationQueueUrl))
-        {
-            await _sqsClient.SendMessageAsync(new SendMessageRequest
-            {
-                QueueUrl = notificationQueueUrl,
-                MessageBody = message
-            });
-        }
-    }
-
-    public async Task PublishPaymentFailedAsync(Models.Entities.Payment payment)
-    {
-        var message = JsonSerializer.Serialize(new
-        {
-            EventType = "PaymentFailed",
-            StudentId = payment.StudentId,
-            CourseId = payment.CourseId,
-            OrderId = payment.OrderId,
-            Timestamp = DateTime.UtcNow
-        });
-
         await _sqsClient.SendMessageAsync(new SendMessageRequest
         {
-            QueueUrl = _config["SQS:PaymentFailedQueue"],
-            MessageBody = message
-        });
-    }
-
-    public async Task PublishCourseAccessRevokedAsync(Models.Entities.Payment payment)
-    {
-        var message = JsonSerializer.Serialize(new
-        {
-            EventType = "CourseAccessRevoked",
-            StudentId = payment.StudentId,
-            CourseId = payment.CourseId,
-            TransactionId = payment.TransactionId,
-            Timestamp = DateTime.UtcNow
-        });
-
-        await _sqsClient.SendMessageAsync(new SendMessageRequest
-        {
-            QueueUrl = _config["SQS:CourseAccessRevokedQueue"],
+            QueueUrl = enrollmentQueueUrl,
             MessageBody = message
         });
     }

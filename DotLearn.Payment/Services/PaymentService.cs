@@ -205,7 +205,7 @@ public class PaymentService : IPaymentService
             };
 
             await _repo.AddAsync(payment);
-            await _sqsService.PublishPaymentFailedAsync(payment);
+            // Payment failure is recorded to DB; no SQS consumer exists
         }
     }
 
@@ -221,7 +221,7 @@ public class PaymentService : IPaymentService
 
         payment.Status = PaymentStatus.Refunded;
         await _repo.UpdateAsync(payment);
-        await _sqsService.PublishCourseAccessRevokedAsync(payment);
+        // Refund recorded to DB; no SQS consumer exists for CourseAccessRevoked
 
         return MapToDto(payment);
     }
