@@ -1,0 +1,50 @@
+﻿
+# .NET Core / Build Results
+[Dd]ebug/
+[Rr]elease/
+bin/
+obj/
+publish/
+artifacts/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.sln.doccache
+.history/
+
+# NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+*.nuget.props
+*.nuget.targets
+
+# Sensitive Information (DO NOT REMOVE)
+appsettings.Development.json
+*.secret.json
+cert/
+.env
+
+# Logs and Temps
+*.log
+*.tmp
+*.tmp_proj
+[Ll]og/
+[Ll]ogs/
+
+# Local Dev Factories
+
+
+DotLearn.Payment/Data/PaymentDbContextFactory.cs
+
+# Custom Deployment Artifact Ignores
+*.tar.gz
+publish-*/
+publish-v*
+*.sql
+migration_error_capture.txt
