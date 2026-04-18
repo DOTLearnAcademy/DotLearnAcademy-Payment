@@ -27,6 +27,7 @@ jobs:
         
       - name: Build Docker Image
         run: docker build -t $ECR_REGISTRY/dotlearn-$SERVICE_NAME:${{ github.sha }} .
+        docker tag $ECR_REGISTRY/dotlearn-$SERVICE_NAME:${{ github.sha }} $ECR_REGISTRY/dotlearn-$SERVICE_NAME:latest
         
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -39,3 +40,16 @@ jobs:
         run: |
           aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REGISTRY
           docker push $ECR_REGISTRY/dotlearn-$SERVICE_NAME:${{ github.sha }}
+          docker push $ECR_REGISTRY/dotlearn-$SERVICE_NAME:latest
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/dotlearn
+            aws ecr get-login-password --region ap-southeast-2 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-2.amazonaws.com
+            sudo docker compose -f docker-compose.prod.yml pull ${{ env.SERVICE_NAME }}
+            sudo docker compose -f docker-compose.prod.yml up -d
