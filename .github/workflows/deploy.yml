@@ -2,7 +2,7 @@ name: Deploy Service
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ main ]
 
 env:
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-2.amazonaws.com
@@ -26,7 +26,8 @@ jobs:
         run: dotnet test --no-restore --collect:"XPlat Code Coverage"
         
       - name: Build Docker Image
-        run: docker build -t $ECR_REGISTRY/dotlearn-$SERVICE_NAME:${{ github.sha }} .
+        run: |
+          docker build -t $ECR_REGISTRY/dotlearn-$SERVICE_NAME:${{ github.sha }} .
         docker tag $ECR_REGISTRY/dotlearn-$SERVICE_NAME:${{ github.sha }} $ECR_REGISTRY/dotlearn-$SERVICE_NAME:latest
         
       - name: Configure AWS credentials
