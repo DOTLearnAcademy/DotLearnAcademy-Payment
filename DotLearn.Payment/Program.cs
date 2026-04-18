@@ -41,7 +41,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<DotLearn.Payment.Middleware.CorrelationIdDelegatingHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHttpClient().AddHttpMessageHandler<DotLearn.Payment.Middleware.CorrelationIdDelegatingHandler>();
+builder.Services.AddHttpClient();
 
 // Internal Microservice communication client
 builder.Services.AddHttpClient<ICourseClient, CourseClient>(client =>
