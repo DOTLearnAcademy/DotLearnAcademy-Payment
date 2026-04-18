@@ -37,9 +37,11 @@ builder.Services.AddDbContext<PaymentDbContext>(options =>
 builder.Services.AddHealthChecks().AddSqlServer(connStr);
 
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<DotLearn.Payment.Middleware.CorrelationIdDelegatingHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient().AddHttpMessageHandler<DotLearn.Payment.Middleware.CorrelationIdDelegatingHandler>();
 
 // Internal Microservice communication client
 builder.Services.AddHttpClient<ICourseClient, CourseClient>(client =>
